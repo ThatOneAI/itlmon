@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "itlmon"
+version = "0.0.1"
+authors = [
+  { name="That Dev", email="sunny@thatone.ai" },
+]
+description = "Utility functions for provisioning"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "watchdog",
+    "textual",
+    "itllib",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+]
+

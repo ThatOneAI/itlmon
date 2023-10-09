@@ -1,0 +1,69 @@
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# React Native ignore files
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Terraform cache files
+# Ignore Terraform .tfstate files
+*.tfstate
+*.tfstate.*
+*.terraform.lock.*
+**/.terraform/*
+
+# Temporary files created by Metro to check the health of the file watcher
+.metro-health-check*
+
+
+# Vim temporary files
+*.swp
+*.swo
+
+# Other common files and directories to ignore
+*.log
+*.tmp
+*.bak
+*.db
+*.sqlite3
+*.sqlite
+*.pid
+*.lock
+*.retry
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Virtual environment and IDE-related files
+venv/
+venv.bak/
+*.pyc
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.bak
+*.swp
+*.swo
+
+# Helm cache files
+.cache/
