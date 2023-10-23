@@ -1,13 +1,10 @@
 import argparse
-import os
-import random
-import yaml
-
-import curses
 
 from itllib import Itl
+from .chat_interface import ChatInterface
 from .stream_interface import StreamInterface
 from .directory_watcher import DirectoryWatcher
+from .cluster_interface import ClusterInterface
 
 parser = argparse.ArgumentParser(description="Upload files to S3")
 parser.add_argument(
@@ -27,27 +24,32 @@ args = parser.parse_args()
 
 # Connect to the loop
 itl = Itl()
+itl.apply_config(args.config, args.secrets)
 
-with open(args.config) as inp:
-    config = yaml.safe_load(inp)
-
-itl.apply_config(config, args.secrets)
-
-streams = [x['name'] for x in config['streams']]
-itl.upstreams(streams)
-itl.downstreams(streams)
-
-itl.start_thread()
+chat = ChatInterface()
 
 # Display the terminal interface
-chat = StreamInterface(itl, streams)
+streams = StreamInterface(itl, chat)
+clusters = ClusterInterface(itl, chat)
 
-@chat.onmessage()
-async def send_message(channel, message):
-    if channel not in streams:
-        return
-    await itl.stream_send(channel, message)
 
-chat.start()
+@chat.oncommand("/help")
+async def help_handler(channel, msg):
+    chat.display_message("#system", "Available commands:")
+    for command in chat.command_handlers:
+        chat.display_message("#system", command)
 
+
+@chat.oncommand("/quit")
+async def quit_handler(channel, msg):
+    chat.exit()
+
+
+# This blocks until the chat is closed
+itl.start_thread()
+clusters.start()
+chat.run()
+
+# Clean up
+clusters.stop()
 itl.stop_thread()

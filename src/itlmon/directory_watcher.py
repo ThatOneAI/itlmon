@@ -231,9 +231,9 @@ class DirectoryWatcher:
             if re.match(pattern, relpath):
                 for handler in self._put_handlers[pattern]:
                     if inspect.iscoroutinefunction(handler):
-                        await handler(fullpath=fullpath, relpath=filepath)
+                        await handler(fullpath=fullpath, relpath=relpath)
                     else:
-                        handler(fullpath=fullpath, relpath=filepath)
+                        handler(fullpath=fullpath, relpath=relpath)
 
         # try:
         #     mtime = os.path.getmtime(filepath)
@@ -248,12 +248,12 @@ class DirectoryWatcher:
     async def delete(self, filepath):
         # relpath = os.path.relpath(filepath, self.directory)
         # response = self.client.delete_object(Bucket=self.bucket, Key=self.key_prefix + relpath)
-        fullpath = os.path.normpath(filepath)
+        fullpath = os.path.realpath(filepath)
         relpath = os.path.relpath(filepath, self.directory)
         for pattern in self._delete_handlers:
             if re.match(pattern, relpath):
                 for handler in self._delete_handlers[pattern]:
                     if inspect.iscoroutinefunction(handler):
-                        await handler(fullpath=fullpath, relpath=filepath)
+                        await handler(fullpath=fullpath, relpath=relpath)
                     else:
-                        handler(fullpath=fullpath, relpath=filepath)
+                        handler(fullpath=fullpath, relpath=relpath)
