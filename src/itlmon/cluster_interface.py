@@ -58,16 +58,18 @@ class ClusterInterface:
 
         self.cluster_parser = CommandParser(self.chat, prog="/cluster", add_help=False)
         self.cluster_parser.add_argument(
+            "cluster", type=str, help="Name of the cluster, from config.yaml"
+        )
+        self.cluster_parser.add_argument(
             "command",
             type=str,
             choices=["get", "apply", "delete"],
             help="Command to run",
         )
-        self.cluster_parser.add_argument(
-            "cluster", type=str, help="Name of the cluster, from config.yaml"
-        )
 
-        self.cluster_get_parser = CommandParser(self.chat, prog="/cluster get cluster")
+        self.cluster_get_parser = CommandParser(
+            self.chat, prog="/cluster clusterName get"
+        )
         self.cluster_get_parser.add_argument(
             "--group", type=str, required=False, help="Name of the resource group"
         )
@@ -82,7 +84,7 @@ class ClusterInterface:
         )
 
         self.cluster_apply_parser = CommandParser(
-            self.chat, prog="/cluster apply cluster"
+            self.chat, prog="/cluster clusterName apply"
         )
         self.cluster_apply_parser.add_argument(
             "path",
@@ -91,7 +93,7 @@ class ClusterInterface:
         )
 
         self.cluster_delete_parser = CommandParser(
-            self.chat, prog="/cluster delete cluster"
+            self.chat, prog="/cluster clusterName delete"
         )
         self.cluster_delete_parser.add_argument(
             "--group", type=str, required=True, help="Name of the resource group"
@@ -111,6 +113,9 @@ class ClusterInterface:
         self._attach_command_handler()
 
     async def _apply(self, cluster, data, force=False):
+        if cluster not in self.itl._clusters:
+            self.chat.display_message("#system", f"Can't find cluster {cluster}")
+            return
         database = self.itl._clusters[cluster].database.name
         if "apiVersion" not in data or data["apiVersion"].count("/") != 1:
             self.chat.display_message(
@@ -142,6 +147,9 @@ class ClusterInterface:
         await self.itl.resource_apply(cluster, data)
 
     async def _delete_remote(self, cluster, group, version, kind, name, force=False):
+        if cluster not in self.itl._clusters:
+            self.chat.display_message("#system", f"Can't find cluster {cluster}")
+            return
         database = self.itl._clusters[cluster].database.name
         key = os.path.join(database, group, version, kind, name)
         if not force:
@@ -212,7 +220,7 @@ class ClusterInterface:
                 return
             self.chat.display_message("#system", f"Updating local {path}")
             with open(path, "w") as out:
-                yaml.dump(data, out, indent=2)
+                yaml.dump(data, out, indent=2, sort_keys=False)
 
     async def _delete_local(self, database, group, version, kind, name):
         key = os.path.join(database, group, version, kind, name)
@@ -238,10 +246,18 @@ class ClusterInterface:
     def _attach_command_handler(self):
         @self.chat.oncommand("/cluster")
         async def cluster_handler(channel, msg):
+            if not msg:
+                msg = "--help"
             args = shlex.split(msg)
             try:
                 args, rest = self.cluster_parser.parse_known_args(args)
+
                 cluster = args.cluster
+                if cluster not in self.itl._clusters:
+                    self.chat.display_message(
+                        "#system", f"Can't find cluster {cluster}"
+                    )
+                    return
                 database = self.itl._clusters[cluster].database.name
                 if args.command == "get":
                     args = self.cluster_get_parser.parse_args(rest)
@@ -266,9 +282,6 @@ class ClusterInterface:
                             "#system",
                             f"Getting {cluster}/{result['group']}/{result['version']}/{result['kind']}/{result['name']}",
                         )
-                        self.chat.display_message(
-                            "#system", f"Config: {json.dumps(result['config'])}"
-                        )
                         await self._get(
                             database,
                             result["group"],
@@ -279,9 +292,32 @@ class ClusterInterface:
                         )
                 elif args.command == "apply":
                     args = self.cluster_apply_parser.parse_args(rest)
-                    with open(args.path) as inp:
-                        data = yaml.safe_load(inp)
-                    await self._apply(cluster, data, force=True)
+                    if os.path.isfile(args.path):
+                        try:
+                            with open(args.path) as inp:
+                                data = yaml.safe_load(inp)
+                            await self._apply(cluster, data, force=True)
+                        except Exception as e:
+                            self.chat.display_message(
+                                "#system", f"Failed to load yaml from {args.path}: {e}"
+                            )
+                    elif os.path.isdir(args.path):
+                        for root, dirs, files in os.walk(args.path):
+                            for file in files:
+                                if not file.endswith(".yaml"):
+                                    continue
+                                path = os.path.join(root, file)
+                                try:
+                                    with open(path) as inp:
+                                        data = yaml.safe_load(inp)
+                                    await self._apply(cluster, data, force=True)
+                                except Exception as e:
+                                    self.chat.display_message(
+                                        "#system",
+                                        f"Failed to load yaml from {path}: {e}",
+                                    )
+                    else:
+                        self.chat.display_message("#system", f"Can't find {args.path}")
                 elif args.command == "delete":
                     args = self.cluster_delete_parser.parse_args(rest)
                     await self._delete_remote(

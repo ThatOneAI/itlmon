@@ -144,7 +144,11 @@ class InputBox(Input):
             if self.value == "":
                 return
             await self.on_submit(self.value)
-            self.history.append("")
+            if len(self.history) < 2 or (self.value != self.history[-2]):
+                self.history[-1] = self.value
+                self.history.append("")
+            else:
+                self.history[-1] = ""
             self.current_index = len(self.history) - 1
             self.value = ""
 
@@ -252,9 +256,10 @@ class ChatInterface(App):
 
     def switch_channel(self, new_channel):
         self.current_view.add_class("channel-invisible")
-        self.current_view = self.channel_views[new_channel]
+        self.current_view: ChannelView = self.channel_views[new_channel]
         self.current_view.remove_class("channel-invisible")
 
+        self.current_view.scroll_end(animate=False)
         self.current_view.input.focus()
         self.current_channel = new_channel
 

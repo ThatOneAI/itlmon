@@ -6,6 +6,7 @@ from .stream_interface import StreamInterface
 from .directory_watcher import DirectoryWatcher
 from .cluster_interface import ClusterInterface
 
+
 parser = argparse.ArgumentParser(description="Upload files to S3")
 parser.add_argument(
     "--secrets",
@@ -46,10 +47,10 @@ async def quit_handler(channel, msg):
 
 
 # This blocks until the chat is closed
-itl.start_thread()
+itl.start()
 clusters.start()
 chat.run()
 
 # Clean up
 clusters.stop()
-itl.stop_thread()
+itl.stop()

@@ -5,7 +5,7 @@ import os
 from urllib.parse import urlparse
 from botocore.exceptions import NoCredentialsError
 
-from itllib import Itl, main as itlMain
+from itllib import Itl
 
 
 def split_s3_url(url):
