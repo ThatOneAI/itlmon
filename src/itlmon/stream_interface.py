@@ -1,7 +1,6 @@
 import argparse
 import atexit
 from collections import defaultdict
-import curses
 from glob import glob
 import json
 import asyncio
