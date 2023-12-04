@@ -103,7 +103,7 @@ class StreamInterface:
             stream_identifier = self._channel_streams[channel]
             chat.display_message("#system", f"sending to {stream_identifier}: {msg}")
 
-            await self.itl.stream_send(stream_identifier, msg)
+            self.itl.stream_send(stream_identifier, msg)
 
         @chat.oncommand("/obj")
         async def obj_handler(channel, msg):
@@ -115,7 +115,7 @@ class StreamInterface:
                 chat.display_message("#system", f"Invalid JSON: {msg}")
                 return
             stream_identifier = self._channel_streams[channel]
-            await self.itl.stream_send(stream_identifier, json_data)
+            self.itl.stream_send(stream_identifier, json_data)
 
         @chat.oncommand("/stream")
         async def stream_handler(channel, msg):
