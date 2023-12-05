@@ -129,14 +129,28 @@ class StreamInterface:
                 if parsed_args.command == "add":
                     args = self.stream_add_parser.parse_args(rest)
                     if args.url:
+                        if args.loop:
+                            chat.display_message(
+                                "#system",
+                                "Cannot specify both a loop and a URL",
+                            )
+                            return
                         stream_identifier = args.url
                         chat.display_message(
                             "#system",
                             f"Adding stream {channel_name} <-> {stream_identifier}",
                         )
-                    else:
+                    elif args.loop:
+                        if args.loop not in self.itl._loops:
+                            chat.display_message(
+                                "#system",
+                                f"Loop {args.loop} does not exist",
+                            )
+                            return
+
                         stream_identifier = channel_name
                         key = args.key or stream_identifier
+
                         chat.display_message(
                             "#system", f"Adding stream {args.loop}/{key}"
                         )
@@ -150,6 +164,12 @@ class StreamInterface:
                                 }
                             ]
                         )
+                    else:
+                        chat.display_message(
+                            "#system",
+                            "Must specify either a loop or a url",
+                        )
+                        return
 
                     self.itl.ondata(stream_identifier)(
                         self._create_handler(channel_name, stream_identifier)
