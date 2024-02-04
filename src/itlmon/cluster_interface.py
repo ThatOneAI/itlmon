@@ -332,8 +332,8 @@ class ClusterInterface:
                 return
 
     def _attach_clusters(self):
-        for cluster_obj in self.itl._clusters.values():
-            self.itl.ondata(cluster_obj.stream)(self._create_handler())
+        for cluster in self.itl._clusters.keys():
+            self.itl.ondata('cluster/' + cluster)(self._create_handler())
 
     def start(self):
         if not os.path.exists(self.directory):
