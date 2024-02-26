@@ -45,11 +45,11 @@ class StreamInterface:
             "--loop", type=str, required=False, help="Name of the loop"
         )
         self.stream_add_parser.add_argument(
-            "--key",
+            "--streamId",
             type=str,
             required=False,
             default=None,
-            help="Key of the stream, defaults to stream name",
+            help="Id of the stream, defaults to stream name",
         )
         self.stream_add_parser.add_argument(
             "--group",
@@ -90,7 +90,7 @@ class StreamInterface:
     def _attach_streams(self):
         for stream_identifier in self.itl._streams:
             self.itl.ondata(stream_identifier)(
-                self._create_handler(stream_identifier, stream_identifier)
+                self._create_handler(stream_identifier, {"stream": stream_identifier})
             )
             self.chat.add_channel(stream_identifier)
 
@@ -102,7 +102,7 @@ class StreamInterface:
             stream_identifier = self._channel_streams[channel]
             chat.display_message("#system", f"sending to {stream_identifier}: {msg}")
 
-            self.itl.stream_send(stream_identifier, msg)
+            self.itl.stream_send(message=msg, **stream_identifier)
 
         @chat.oncommand("/obj")
         async def obj_handler(channel, msg):
@@ -114,7 +114,7 @@ class StreamInterface:
                 chat.display_message("#system", f"Invalid JSON: {msg}")
                 return
             stream_identifier = self._channel_streams[channel]
-            self.itl.stream_send(stream_identifier, json_data)
+            self.itl.stream_send(message=json_data, **stream_identifier)
 
         @chat.oncommand("/stream")
         async def stream_handler(channel, msg):
@@ -128,19 +128,7 @@ class StreamInterface:
 
                 if parsed_args.command == "add":
                     args = self.stream_add_parser.parse_args(rest)
-                    if args.url:
-                        if args.loop:
-                            chat.display_message(
-                                "#system",
-                                "Cannot specify both a loop and a URL",
-                            )
-                            return
-                        stream_identifier = args.url
-                        chat.display_message(
-                            "#system",
-                            f"Adding stream {channel_name} <-> {stream_identifier}",
-                        )
-                    elif args.loop:
+                    if args.loop:
                         if args.loop not in self.itl._loops:
                             chat.display_message(
                                 "#system",
@@ -148,30 +136,20 @@ class StreamInterface:
                             )
                             return
 
-                        stream_identifier = channel_name
-                        key = args.key or stream_identifier
+                        streamId = args.streamId or stream_identifier
+                        stream_identifier = {"loop": args.loop, "streamId": streamId}
 
                         chat.display_message(
-                            "#system", f"Adding stream {args.loop}/{key}"
-                        )
-                        self.itl.update_streams(
-                            [
-                                {
-                                    "name": stream_identifier,
-                                    "loop": args.loop,
-                                    "key": key,
-                                    "group": args.group,
-                                }
-                            ]
+                            "#system", f"Adding stream {args.loop}/{streamId}"
                         )
                     else:
                         chat.display_message(
                             "#system",
-                            "Must specify either a loop or a url",
+                            "Must specify either a loop",
                         )
                         return
 
-                    self.itl.ondata(stream_identifier)(
+                    self.itl.ondata(loop=args.loop, streamId=streamId)(
                         self._create_handler(channel_name, stream_identifier)
                     )
                     self.chat.add_channel(channel_name)

@@ -17,7 +17,7 @@ requires-python = ">=3.7"
 dependencies = [
     "watchdog",
     "textual",
-    "itllib@git+https://github.com/ThatOneAI/itllib",
+    "itllib",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",

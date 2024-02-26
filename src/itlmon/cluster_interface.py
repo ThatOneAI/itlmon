@@ -18,14 +18,6 @@ def _split_path(path: str, base: str):
     return parts
 
 
-def _get_relevant_clusters(itl: Itl, database: str, name: str):
-    for cluster, cluster_obj in itl._clusters.items():
-        if cluster_obj.database.name != database:
-            continue
-        if name.startswith(cluster_obj.prefix):
-            yield cluster
-
-
 def compare(a, b):
     if a == b:
         return True
@@ -50,7 +42,7 @@ def compare(a, b):
 
 class ClusterInterface:
     def __init__(self, itl: Itl, chat: ChatInterface, directory="./clusters"):
-        self.itl = itl
+        self.itl: Itl = itl
         self.chat = chat
         self.directory = os.path.normpath(directory)
         self.watcher = DirectoryWatcher(self.directory)
@@ -116,7 +108,6 @@ class ClusterInterface:
         if cluster not in self.itl._clusters:
             self.chat.display_message("#system", f"Can't find cluster {cluster}")
             return
-        database = self.itl._clusters[cluster].database.name
         if "apiVersion" not in data or data["apiVersion"].count("/") != 1:
             self.chat.display_message(
                 "#system",
@@ -134,29 +125,28 @@ class ClusterInterface:
             )
             return
         name = data["metadata"]["name"]
-        key = os.path.join(database, group, version, kind, name)
+        key = os.path.join(cluster, group, version, kind, name)
         if force or key not in self.remote_state:
             self.chat.display_message("#system", f"Updating remote {key}")
-            await self.itl.resource_apply(cluster, data)
+            await self.itl.cluster_apply(cluster, data)
             return
 
         remote_contents = self.remote_state[key]
         if remote_contents == data:
             return
         self.chat.display_message("#system", f"Updating remote {key}")
-        await self.itl.resource_apply(cluster, data)
+        await self.itl.cluster_apply(cluster, data)
 
     async def _delete_remote(self, cluster, group, version, kind, name, force=False):
         if cluster not in self.itl._clusters:
             self.chat.display_message("#system", f"Can't find cluster {cluster}")
             return
-        database = self.itl._clusters[cluster].database.name
-        key = os.path.join(database, group, version, kind, name)
+        key = os.path.join(cluster, group, version, kind, name)
         if not force:
             if key not in self.remote_state or self.remote_state[key] == None:
                 return
         self.chat.display_message("#system", f"Deleting remote {key}")
-        await self.itl.resource_delete(cluster, group, version, kind, name)
+        await self.itl.cluster_delete(cluster, group, version, kind, name)
 
     def _attach_fs_handlers(self):
         @self.watcher.onput(r".*")
@@ -170,7 +160,7 @@ class ClusterInterface:
             # check if the remote file is different from the local one
             try:
                 with open(os.path.join(self.directory, relpath)) as inp:
-                    data = yaml.safe_load(inp)
+                    data = [x for x in yaml.safe_load_all(inp)]
             except:
                 self.chat.display_message(
                     "#system", f"Failed to load yaml from {relpath}"
@@ -178,7 +168,8 @@ class ClusterInterface:
                 return
 
             try:
-                return await self._apply(cluster, data)
+                for document in data:
+                    return await self._apply(cluster, document)
             except Exception as e:
                 self.chat.display_message("#system", f"Failed to apply {relpath}: {e}")
                 return
@@ -195,51 +186,53 @@ class ClusterInterface:
                 return
             return await self._delete_remote(cluster, group, version, kind, name)
 
-    async def _get(self, database, group, version, kind, name, data=None):
-        key = os.path.join(database, group, version, kind, name)
-        for cluster in _get_relevant_clusters(self.itl, database, name):
-            # check if the local file should be updated
-            if data == None:
-                data = await self.itl.resource_read(cluster, group, version, kind, name)
-            if data == None:
-                self.chat.display_message(
-                    "#system",
-                    f"Failed to get {cluster}/{group}/{version}/{kind}/{name}",
-                )
-                del self.remote_state[key]
-                return
-            path = f"{os.path.join(self.directory, cluster, group, version, kind, name)}.yaml"
-            self.remote_state[key] = data
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            try:
-                with open(path) as inp:
-                    local_data = yaml.safe_load(inp)
-            except:
-                local_data = None
-            if local_data == data:
-                return
-            self.chat.display_message("#system", f"Updating local {path}")
-            with open(path, "w") as out:
-                yaml.dump(data, out, indent=2, sort_keys=False)
+    async def _get(self, cluster, group, version, kind, name, data=None):
+        key = os.path.join(cluster, group, version, kind, name)
+        # check if the local file should be updated
+        if data == None:
+            data = await self.itl.cluster_read(cluster, group, version, kind, name)
+        if data == None:
+            self.chat.display_message(
+                "#system",
+                f"Failed to get {cluster}/{group}/{version}/{kind}/{name}",
+            )
+            del self.remote_state[key]
+            return
+        path = (
+            f"{os.path.join(self.directory, cluster, group, version, kind, name)}.yaml"
+        )
+        self.remote_state[key] = data
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            with open(path) as inp:
+                local_data = yaml.safe_load(inp)
+        except:
+            local_data = None
+        if local_data == data:
+            return
+        self.chat.display_message("#system", f"Updating local {path}")
+        with open(path, "w") as out:
+            yaml.dump(data, out, indent=2, sort_keys=False)
 
-    async def _delete_local(self, database, group, version, kind, name):
-        key = os.path.join(database, group, version, kind, name)
-        for cluster in _get_relevant_clusters(self.itl, database, name):
-            path = f"{os.path.join(self.directory, cluster, group, version, kind, name)}.yaml"
-            self.remote_state[key] = None
-            if not os.path.exists(path):
-                return
-            self.chat.display_message("#system", f"Deleting local {path}")
-            os.remove(path)
+    async def _delete_local(self, cluster, group, version, kind, name):
+        key = os.path.join(cluster, group, version, kind, name)
+        path = (
+            f"{os.path.join(self.directory, cluster, group, version, kind, name)}.yaml"
+        )
+        self.remote_state[key] = None
+        if not os.path.exists(path):
+            return
+        self.chat.display_message("#system", f"Deleting local {path}")
+        os.remove(path)
 
     def _create_handler(self):
         async def remote_config_changed(
-            event, url, database, group, version, kind, name, timestamp, **kwargs
+            event, url, cluster, group, version, kind, name, timestamp, **kwargs
         ):
             if event == "put":
-                await self._get(database, group, version, kind, name)
+                await self._get(cluster, group, version, kind, name)
             elif event == "delete":
-                await self._delete_local(database, group, version, kind, name)
+                await self._delete_local(cluster, group, version, kind, name)
 
         return remote_config_changed
 
@@ -258,14 +251,13 @@ class ClusterInterface:
                         "#system", f"Can't find cluster {cluster}"
                     )
                     return
-                database = self.itl._clusters[cluster].database.name
                 if args.command == "get":
                     args = self.cluster_get_parser.parse_args(rest)
                     self.chat.display_message(
                         "#system",
                         f"Getting {cluster}/{args.group}/{args.version}/{args.kind}/{args.name}",
                     )
-                    results = await self.itl.resource_read_all(
+                    results = await self.itl.cluster_read_all(
                         cluster, args.group, args.version, args.kind, args.name
                     )
                     if not results:
@@ -283,7 +275,7 @@ class ClusterInterface:
                             f"Getting {cluster}/{result['group']}/{result['version']}/{result['kind']}/{result['name']}",
                         )
                         await self._get(
-                            database,
+                            cluster,
                             result["group"],
                             result["version"],
                             result["kind"],
@@ -295,8 +287,9 @@ class ClusterInterface:
                     if os.path.isfile(args.path):
                         try:
                             with open(args.path) as inp:
-                                data = yaml.safe_load(inp)
-                            await self._apply(cluster, data, force=True)
+                                data = yaml.safe_load_all(inp)
+                                for doc in data:
+                                    await self._apply(cluster, doc, force=True)
                         except Exception as e:
                             self.chat.display_message(
                                 "#system", f"Failed to load yaml from {args.path}: {e}"
@@ -309,8 +302,9 @@ class ClusterInterface:
                                 path = os.path.join(root, file)
                                 try:
                                     with open(path) as inp:
-                                        data = yaml.safe_load(inp)
-                                    await self._apply(cluster, data, force=True)
+                                        data = yaml.safe_load_all(inp)
+                                        for doc in data:
+                                            await self._apply(cluster, doc, force=True)
                                 except Exception as e:
                                     self.chat.display_message(
                                         "#system",
@@ -333,11 +327,11 @@ class ClusterInterface:
 
     def _attach_clusters(self):
         for cluster in self.itl._clusters.keys():
-            self.itl.ondata('cluster/' + cluster)(self._create_handler())
+            self.itl.ondata("cluster/" + cluster)(self._create_handler())
 
     def start(self):
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory, exist_ok=True)
+        # if not os.path.exists(self.directory):
+        # os.makedirs(self.directory, exist_ok=True)
 
         self.watcher.start()
 

@@ -193,17 +193,20 @@ class DirectoryWatcher:
 
         event_handler = WatcherHandler(self.file_watcher)
         self.observer = Observer()
-        self.observer.schedule(event_handler, directory, recursive=True)
+        # self.observer.schedule(event_handler, directory, recursive=True)
 
-        os.makedirs(self.directory, exist_ok=True)
+        # os.makedirs(self.directory, exist_ok=True)
+        pass
 
     def start(self):
-        self.file_watcher.start()
-        self.observer.start()
+        # self.file_watcher.start()
+        # self.observer.start()
+        pass
 
     def stop(self):
-        self.observer.stop()
-        self.file_watcher.stop()
+        # self.observer.stop()
+        # self.file_watcher.stop()
+        pass
 
     def join(self):
         self.observer.join()

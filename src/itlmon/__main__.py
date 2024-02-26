@@ -9,7 +9,7 @@ from .cluster_interface import ClusterInterface
 
 parser = argparse.ArgumentParser(description="Upload files to S3")
 parser.add_argument(
-    "client",
+    "--client",
     type=str,
     help="Name of the client to connect with.",
 )
@@ -20,16 +20,16 @@ parser.add_argument(
     help="Directory to search for secret keys.",
 )
 parser.add_argument(
-    "--config",
+    "--resources",
     default="./loop-resources",
     type=str,
-    help="File containing the service configuration.",
+    help="File containing the resource configurations.",
 )
 args = parser.parse_args()
 
 
 # Connect to the loop
-itl = Itl(args.config, args.secrets, client=args.client)
+itl = Itl(args.resources, args.secrets, client=args.client)
 
 chat = ChatInterface()
 

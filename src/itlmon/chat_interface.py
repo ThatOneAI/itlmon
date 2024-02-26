@@ -127,6 +127,7 @@ class MessageView(Widget):
         new_message = Message(channel, message)
         self.mount(new_message)
         new_message.scroll_visible()
+        return new_message
 
 
 class InputBox(Input):
@@ -176,6 +177,7 @@ class ChannelView(Widget):
             dock: bottom;
         }
     """
+    last_message = None
 
     def __init__(self, channel_name, message_handler=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -189,7 +191,7 @@ class ChannelView(Widget):
         yield self.input
 
     def add_message(self, text):
-        self.message_view.add_message(self.channel_name, text)
+        self.last_message = self.message_view.add_message(self.channel_name, text)
 
     async def _handle_message(self, text):
         if self.message_handler is not None:
@@ -259,7 +261,8 @@ class ChatInterface(App):
         self.current_view: ChannelView = self.channel_views[new_channel]
         self.current_view.remove_class("channel-invisible")
 
-        self.current_view.scroll_end(animate=False)
+        if self.current_view.last_message != None:
+            self.current_view.last_message.scroll_visible(animate=False, force=True)
         self.current_view.input.focus()
         self.current_channel = new_channel
 
